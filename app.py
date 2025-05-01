@@ -9,6 +9,7 @@ import time
 from docx import Document
 import os
 
+# Load environment variables
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY environment variable not set")
@@ -18,6 +19,7 @@ model_config = GenerateContentConfig(temperature=0.75, top_p=0.9)
 
 app = FastAPI()
 
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -113,3 +115,9 @@ async def generate_agreement(data: AgreementInput):
         return {"agreement": response.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Run the app with Uvicorn for local development
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))  # Use PORT env var or default to 8000
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=True)  # reload=True for local dev
