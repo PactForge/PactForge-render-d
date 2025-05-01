@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import chromadb
 import google.generativeai as genai
+from google.generativeai.types import GenerateContentConfig, EmbedContentConfig
 import time
 from docx import Document
 import os
@@ -14,12 +15,7 @@ if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY environment variable not set")
 
 client = genai.Client(api_key=GOOGLE_API_KEY)
-
-# ✅ Define config as a plain dict
-model_config = {
-    "temperature": 0.75,
-    "top_p": 0.9
-}
+model_config = GenerateContentConfig(temperature=0.75, top_p=0.9)
 
 app = FastAPI()
 
@@ -111,20 +107,17 @@ async def generate_agreement(data: AgreementInput):
             Make it clear, complete, and legally sound. Output only the agreement text.
         """
 
-        # ✅ Use GenerationConfig to wrap model_config
-        generation_config = genai.types.GenerationConfig(**model_config)
-
         response = client.generate_content(
             model="gemini-pro",
             contents=prompt,
-            generation_config=generation_config
+            generation_config=model_config
         )
         return {"agreement": response.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# For local testing (optional)
+# Run the app with Uvicorn for local development
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    port = int(os.getenv("PORT", 8000))  # Use PORT env var or default to 8000
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=True)  # reload=True for local dev
