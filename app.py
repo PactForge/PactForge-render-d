@@ -4,22 +4,20 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import chromadb
 import google.generativeai as genai
-from google.generativeai.types import GenerateContentConfig, EmbedContentConfig
+from google.generativeai.types import GenerationConfig
 import time
 from docx import Document
 import os
 
-# Load environment variables
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY environment variable not set")
 
-client = genai.Client(api_key=GOOGLE_API_KEY)
-model_config = GenerateContentConfig(temperature=0.75, top_p=0.9)
+genai.configure(api_key=GOOGLE_API_KEY)
+model_config = GenerationConfig(temperature=0.75, top_p=0.9)
 
 app = FastAPI()
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,7 +31,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 DATA_PATH = "./Clauses"
 collections = {}
-clientdb = chromadb.Client()
+clientdb = chromadb.PersistentClient(path="chromadb")
 agreement_types = ["rent", "nda", "employment", "franchise", "contractor"]
 
 try:
@@ -48,7 +46,7 @@ try:
                 clauses.append(text)
         embeds, ids, docs = [], [], []
         for i, clause in enumerate(clauses):
-            embed = client.embed_content(
+            embed = genai.embed_content(
                 model="models/embedding-001",
                 content=clause,
                 task_type="retrieval_document"
@@ -75,7 +73,7 @@ async def health_check():
 async def generate_agreement(data: AgreementInput):
     try:
         user_input = data.important_info + "\n" + data.extra_info
-        embed = client.embed_content(
+        embed = genai.embed_content(
             model="models/embedding-001",
             content=user_input,
             task_type="retrieval_query"
@@ -107,7 +105,7 @@ async def generate_agreement(data: AgreementInput):
             Make it clear, complete, and legally sound. Output only the agreement text.
         """
 
-        response = client.generate_content(
+        response = genai.generate_content(
             model="gemini-pro",
             contents=prompt,
             generation_config=model_config
@@ -115,9 +113,3 @@ async def generate_agreement(data: AgreementInput):
         return {"agreement": response.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# Run the app with Uvicorn for local development
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 8000))  # Use PORT env var or default to 8000
-    uvicorn.run(app, host="0.0.0.0", port=port, reload=True)  # reload=True for local dev
